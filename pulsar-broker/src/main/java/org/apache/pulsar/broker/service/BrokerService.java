@@ -70,9 +70,7 @@ import org.apache.pulsar.broker.service.BrokerServiceException.PersistenceExcept
 import org.apache.pulsar.broker.service.BrokerServiceException.ServerMetadataException;
 import org.apache.pulsar.broker.service.BrokerServiceException.ServiceUnitNotReadyException;
 import org.apache.pulsar.broker.service.nonpersistent.NonPersistentTopic;
-import org.apache.pulsar.broker.service.persistent.DispatchRateLimiter;
 import org.apache.pulsar.broker.service.persistent.PersistentDispatcherMultipleConsumers;
-import org.apache.pulsar.broker.service.persistent.PersistentReplicator;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.broker.stats.ClusterReplicationMetrics;
 import org.apache.pulsar.broker.web.PulsarWebResource;
@@ -91,7 +89,6 @@ import org.apache.pulsar.common.naming.NamespaceBundle;
 import org.apache.pulsar.common.naming.NamespaceBundleFactory;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.policies.data.ClusterData;
-import org.apache.pulsar.common.policies.data.DispatchRate;
 import org.apache.pulsar.common.policies.data.PersistencePolicies;
 import org.apache.pulsar.common.policies.data.PersistentOfflineTopicStats;
 import org.apache.pulsar.common.policies.data.PersistentTopicStats;
@@ -645,7 +642,6 @@ public class BrokerService implements Closeable, ZooKeeperCacheListener<Policies
                 future.completeExceptionally(t);
                 return;
             }
-
             PersistencePolicies persistencePolicies = policies.map(p -> p.persistence).orElseGet(
                     () -> new PersistencePolicies(serviceConfig.getManagedLedgerDefaultEnsembleSize(),
                             serviceConfig.getManagedLedgerDefaultWriteQuorum(),
@@ -657,13 +653,13 @@ public class BrokerService implements Closeable, ZooKeeperCacheListener<Policies
                             serviceConfig.getDefaultRetentionSizeInMB())
             );
 
+
             ManagedLedgerConfig managedLedgerConfig = new ManagedLedgerConfig();
             managedLedgerConfig.setEnsembleSize(persistencePolicies.getBookkeeperEnsemble());
             managedLedgerConfig.setWriteQuorumSize(persistencePolicies.getBookkeeperWriteQuorum());
             managedLedgerConfig.setAckQuorumSize(persistencePolicies.getBookkeeperAckQuorum());
             managedLedgerConfig.setThrottleMarkDelete(persistencePolicies.getManagedLedgerMaxMarkDeleteRate());
             managedLedgerConfig.setDigestType(DigestType.CRC32);
-
             managedLedgerConfig.setMaxUnackedRangesToPersist(serviceConfig.getManagedLedgerMaxUnackedRangesToPersist());
             managedLedgerConfig.setMaxUnackedRangesToPersistInZk(serviceConfig.getManagedLedgerMaxUnackedRangesToPersistInZooKeeper());
             managedLedgerConfig.setMaxEntriesPerLedger(serviceConfig.getManagedLedgerMaxEntriesPerLedger());
