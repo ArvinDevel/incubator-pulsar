@@ -156,5 +156,4 @@ final class EntryImpl extends AbstractReferenceCounted implements Entry, Compara
         entryId = -1;
         recyclerHandle.recycle(this);
     }
-
 }

@@ -23,6 +23,7 @@ import static org.testng.Assert.assertFalse;
 
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.bookkeeper.mledger.proto.MLDataFormats.PositionInfo;
+import org.apache.distributedlog.DLSN;
 import org.testng.annotations.Test;
 
 public class PositionTest {
@@ -78,5 +79,54 @@ public class PositionTest {
         assertEquals(p2.getLedgerId(), 5);
         assertEquals(p2.getEntryId(), 15);
         assertEquals(new PositionImpl(5, 15).hashCode(), p2.hashCode());
+    }
+
+    @Test
+    public void dlsnSimpleTest() {
+        PositionImpl pos = new PositionImpl(new DLSN(1, 2, 0));
+        assertEquals(pos.getLedgerId(), 1);
+        assertEquals(pos.getEntryId(), 2);
+        assertEquals(pos, new PositionImpl(new DLSN(1, 2, 0)));
+
+        assertFalse(pos.equals(new PositionImpl(new DLSN(1, 3, 0))));
+        assertFalse(pos.equals(new PositionImpl(new DLSN(3, 2, 0))));
+        assertFalse(pos.equals("1:2:0"));
+    }
+
+    @Test
+    public void dlsnComparisons() {
+        PositionImpl pos1_1 = new PositionImpl(new DLSN(1, 1, 0));
+        PositionImpl pos2_5 = new PositionImpl(new DLSN(2, 5, 0));
+        PositionImpl pos10_0 = new PositionImpl(new DLSN(10, 0, 0));
+        PositionImpl pos10_1 = new PositionImpl(new DLSN(10, 1, 0));
+
+        assertEquals(0, pos1_1.compareTo(pos1_1));
+        assertEquals(-1, pos1_1.compareTo(pos2_5));
+        assertEquals(-1, pos1_1.compareTo(pos10_0));
+        assertEquals(-1, pos1_1.compareTo(pos10_1));
+
+        assertEquals(+1, pos2_5.compareTo(pos1_1));
+        assertEquals(0, pos2_5.compareTo(pos2_5));
+        assertEquals(-1, pos2_5.compareTo(pos10_0));
+        assertEquals(-1, pos2_5.compareTo(pos10_1));
+
+        assertEquals(+1, pos10_0.compareTo(pos1_1));
+        assertEquals(+1, pos10_0.compareTo(pos2_5));
+        assertEquals(0, pos10_0.compareTo(pos10_0));
+        assertEquals(-1, pos10_0.compareTo(pos10_1));
+
+        assertEquals(+1, pos10_1.compareTo(pos1_1));
+        assertEquals(+1, pos10_1.compareTo(pos2_5));
+        assertEquals(+1, pos10_1.compareTo(pos10_0));
+        assertEquals(0, pos10_1.compareTo(pos10_1));
+    }
+
+    @Test
+    public void dlsnHashes() throws Exception {
+        PositionImpl p1 = new PositionImpl(new DLSN(5, 15, 0));
+        PositionImpl p2 = new PositionImpl(PositionInfo.parseFrom(p1.getPositionInfo().toByteArray()));
+        assertEquals(p2.getLedgerId(), 5);
+        assertEquals(p2.getEntryId(), 15);
+        assertEquals(new PositionImpl(new DLSN(5, 15, 0)).hashCode(), p2.hashCode());
     }
 }

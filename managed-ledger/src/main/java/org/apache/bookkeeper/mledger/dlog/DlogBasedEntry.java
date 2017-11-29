@@ -19,17 +19,22 @@
 package org.apache.bookkeeper.mledger.dlog;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.RecyclableDuplicateByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.AbstractReferenceCounted;
 import io.netty.util.Recycler;
+import io.netty.util.Recycler.Handle;
 import io.netty.util.ReferenceCounted;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.distributedlog.DLSN;
 import org.apache.distributedlog.LogRecordWithDLSN;
+import org.apache.distributedlog.common.util.ByteBufUtils;
 
+/**
+ * Entry implemented by dlog.
+ *
+ */
 final class DlogBasedEntry extends AbstractReferenceCounted implements Entry, Comparable<org.apache.bookkeeper.mledger.dlog.DlogBasedEntry>
 {
     private static final Recycler<DlogBasedEntry> RECYCLER = new Recycler<DlogBasedEntry>() {
@@ -39,7 +44,7 @@ final class DlogBasedEntry extends AbstractReferenceCounted implements Entry, Co
         }
     };
 
-    private final Recycler.Handle recyclerHandle;
+    private final Handle<DlogBasedEntry> recyclerHandle;
     private DLSN dlsn;
 
     ByteBuf data;
@@ -48,17 +53,16 @@ final class DlogBasedEntry extends AbstractReferenceCounted implements Entry, Co
         this.recyclerHandle = recyclerHandle;
     }
 
-    //todo is it ok to use unpool?
     public static DlogBasedEntry create(LogRecordWithDLSN logRecord) {
         DlogBasedEntry entry = RECYCLER.get();
         entry.dlsn = logRecord.getDlsn();
-        entry.data = Unpooled.wrappedBuffer(logRecord.getPayload());
+        entry.data = logRecord.getPayloadBuf();
         entry.data.retain();
         entry.setRefCnt(1);
         return entry;
     }
 
-    // Used just for tests, todo why not call entry.data.retain()?  Unpool related?
+    // Used just for tests
     public static DlogBasedEntry create(DLSN dlsn, byte[] data) {
         DlogBasedEntry entry = RECYCLER.get();
         entry.dlsn = dlsn;
@@ -88,7 +92,7 @@ final class DlogBasedEntry extends AbstractReferenceCounted implements Entry, Co
     public static DlogBasedEntry create(DlogBasedEntry other) {
         DlogBasedEntry entry = RECYCLER.get();
         entry.dlsn = other.dlsn;
-        entry.data = RecyclableDuplicateByteBuf.create(other.data);
+        entry.data = other.data.retainedDuplicate();
         entry.setRefCnt(1);
         return entry;
     }
@@ -99,7 +103,7 @@ final class DlogBasedEntry extends AbstractReferenceCounted implements Entry, Co
         data.release();
         data = null;
         dlsn = null;
-        RECYCLER.recycle(this, recyclerHandle);
+        recyclerHandle.recycle(this);
     }
 
     @Override
@@ -109,15 +113,11 @@ final class DlogBasedEntry extends AbstractReferenceCounted implements Entry, Co
 
     @Override
     public byte[] getData() {
-
-        byte[] array = new byte[(int) data.readableBytes()];
-        data.getBytes(data.readerIndex(), array);
-        return array;
+        return ByteBufUtils.getArray(data);
     }
 
     @Override
     public byte[] getDataAndRelease() {
-
         byte[] array = getData();
         release();
         return array;
@@ -138,19 +138,20 @@ final class DlogBasedEntry extends AbstractReferenceCounted implements Entry, Co
         return new PositionImpl(dlsn);
     }
 
-    //todo remove getLedgerId and getEntryId in Entry
+    // this ledgerId is not actual ledgerId in bk
     @Override
     public long getLedgerId() {
-        return 0;
+        return dlsn.getLogSegmentSequenceNo();
     }
 
     @Override
     public long getEntryId() {
-        return 0;
+        return dlsn.getEntryId();
     }
 
     @Override
     public ReferenceCounted touch(Object hint) {
+        data.touch(hint);
         return this;
     }
 }
